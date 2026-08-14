@@ -16,6 +16,8 @@ Sistema de extração de empresas do Google Maps com Next.js, Supabase, Inngest 
 
 Produção: https://lead-pro-leonardo-mendes-projects1.vercel.app
 
+(Alternativa: https://lead-pro-omega.vercel.app)
+
 Configure as mesmas variáveis de ambiente do `.env.local` no projeto Vercel e sincronize o app Inngest com:
 
 `https://lead-pro-leonardo-mendes-projects1.vercel.app/api/inngest`
