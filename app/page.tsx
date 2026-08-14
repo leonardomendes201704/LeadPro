@@ -28,6 +28,12 @@ export default async function HomePage() {
 
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
+            href="/setup"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+          >
+            Configurar banco
+          </Link>
+          <Link
             href="/signup"
             className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
           >

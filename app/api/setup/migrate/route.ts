@@ -21,22 +21,26 @@ function getConnectionString(password?: string) {
   return `postgresql://postgres.${projectRef}:${encodeURIComponent(dbPassword)}@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`;
 }
 
-export async function GET() {
+async function isSchemaReady() {
   const supabase = createAdminClient();
   const { error } = await supabase.from("scrape_jobs").select("id").limit(1);
+  return !error;
+}
+
+export async function GET() {
+  const ready = await isSchemaReady();
 
   return NextResponse.json({
-    ready: !error,
-    message: error?.message ?? "Database schema is ready",
+    ready,
+    message: ready
+      ? "Database schema is ready"
+      : "Migration pendente — aplique o SQL ou use a senha do banco",
   });
 }
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const expected = `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`;
-
-  if (!authHeader || authHeader !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (await isSchemaReady()) {
+    return NextResponse.json({ ok: true, message: "Schema already ready" });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Configure SUPABASE_DB_PASSWORD or DATABASE_URL, or send { password } in the request body.",
+          "Configure SUPABASE_DB_PASSWORD ou DATABASE_URL, ou envie { password } no body.",
       },
       { status: 400 },
     );
