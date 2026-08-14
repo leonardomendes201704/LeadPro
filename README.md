@@ -14,7 +14,19 @@ Sistema de extração de empresas do Google Maps com Next.js, Supabase, Inngest 
 
 ## Deploy Vercel
 
-Configure as mesmas variáveis de ambiente do `.env.local` no projeto Vercel e sincronize o app Inngest com `https://seu-app.vercel.app/api/inngest`.
+Produção: https://lead-pro-leonardo-mendes-projects1.vercel.app
+
+Configure as mesmas variáveis de ambiente do `.env.local` no projeto Vercel e sincronize o app Inngest com:
+
+`https://lead-pro-leonardo-mendes-projects1.vercel.app/api/inngest`
+
+### Pós-deploy (1x)
+
+1. Abra `/setup` e informe a **senha do banco Supabase** (Settings → Database) para criar as tabelas
+2. No Supabase → Authentication → URL Configuration:
+   - Site URL: `https://lead-pro-leonardo-mendes-projects1.vercel.app`
+   - Redirect URLs: `https://lead-pro-leonardo-mendes-projects1.vercel.app/**`
+3. No Inngest → Apps → confirme sync com a URL `/api/inngest` acima
 
 ## Observações
 
