@@ -56,6 +56,10 @@ export function SetupMigrationPanel({
         Informe a senha do banco criada no Supabase (Settings → Database) para
         aplicar a migration automaticamente.
       </p>
+      <p className="text-sm text-amber-900/80">
+        Se continuar falhando, abra o SQL Editor do Supabase e cole o conteúdo de{" "}
+        <code className="rounded bg-amber-100 px-1">supabase/migrations/001_initial.sql</code>.
+      </p>
 
       <form onSubmit={applyMigration} className="flex flex-wrap gap-3">
         <input

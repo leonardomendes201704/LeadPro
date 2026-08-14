@@ -5,20 +5,56 @@ import { config } from "dotenv";
 
 config({ path: resolve(process.cwd(), ".env.local") });
 
-async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
-  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
-  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(
-    /https:\/\/([^.]+)\.supabase\.co/,
-  )?.[1];
+const POOLER_REGIONS = [
+  "sa-east-1",
+  "us-east-1",
+  "us-west-1",
+  "eu-west-1",
+  "eu-central-1",
+  "ap-southeast-1",
+  "ap-northeast-1",
+];
 
-  let connectionString = databaseUrl;
+function getSupabaseProjectRef(supabaseUrl) {
+  return supabaseUrl?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] ?? null;
+}
 
-  if (!connectionString && dbPassword && projectRef) {
-    connectionString = `postgresql://postgres.${projectRef}:${encodeURIComponent(dbPassword)}@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`;
+function buildCandidates(projectRef, password) {
+  const encodedPassword = encodeURIComponent(password);
+  const candidates = [];
+
+  if (process.env.DATABASE_URL) {
+    candidates.push(process.env.DATABASE_URL);
   }
 
-  if (!connectionString) {
+  candidates.push(
+    `postgresql://postgres:${encodedPassword}@db.${projectRef}.supabase.co:5432/postgres`,
+  );
+
+  for (const region of POOLER_REGIONS) {
+    for (const prefix of ["aws-0", "aws-1"]) {
+      const host = `${prefix}-${region}.pooler.supabase.com`;
+      candidates.push(
+        `postgresql://postgres.${projectRef}:${encodedPassword}@${host}:5432/postgres`,
+      );
+      candidates.push(
+        `postgresql://postgres.${projectRef}:${encodedPassword}@${host}:6543/postgres`,
+      );
+    }
+  }
+
+  return [...new Set(candidates)];
+}
+
+async function main() {
+  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
+  const projectRef = getSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  if (!projectRef) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL inválida ou ausente.");
+  }
+
+  if (!dbPassword && !process.env.DATABASE_URL) {
     throw new Error(
       "Set DATABASE_URL or SUPABASE_DB_PASSWORD in .env.local to apply migrations automatically.",
     );
@@ -29,19 +65,35 @@ async function main() {
     "utf8",
   );
 
-  const client = new pg.Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
+  const candidates = process.env.DATABASE_URL
+    ? [process.env.DATABASE_URL]
+    : buildCandidates(projectRef, dbPassword);
 
-  await client.connect();
-  await client.query(sql);
-  await client.end();
+  let lastError = null;
 
-  console.log("Migration applied successfully.");
+  for (const connectionString of candidates) {
+    const client = new pg.Client({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10_000,
+    });
+
+    try {
+      await client.connect();
+      await client.query(sql);
+      await client.end();
+      console.log("Migration applied successfully.");
+      return;
+    } catch (error) {
+      lastError = error;
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  throw lastError ?? new Error("Failed to apply migration");
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

@@ -1,25 +1,11 @@
 import { NextResponse } from "next/server";
-import pg from "pg";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function getConnectionString(password?: string) {
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
-  }
-
-  const dbPassword = password ?? process.env.SUPABASE_DB_PASSWORD;
-  const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(
-    /https:\/\/([^.]+)\.supabase\.co/,
-  )?.[1];
-
-  if (!dbPassword || !projectRef) {
-    return null;
-  }
-
-  return `postgresql://postgres.${projectRef}:${encodeURIComponent(dbPassword)}@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`;
-}
+import {
+  getSupabaseProjectRef,
+  runSqlMigration,
+} from "@/lib/supabase/postgres-connection";
 
 async function isSchemaReady() {
   const supabase = createAdminClient();
@@ -44,15 +30,18 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const connectionString = getConnectionString(
-    typeof body.password === "string" ? body.password : undefined,
-  );
+  const password =
+    typeof body.password === "string"
+      ? body.password
+      : process.env.SUPABASE_DB_PASSWORD;
 
-  if (!connectionString) {
+  const projectRef = getSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  if (!password || !projectRef) {
     return NextResponse.json(
       {
         error:
-          "Configure SUPABASE_DB_PASSWORD ou DATABASE_URL, ou envie { password } no body.",
+          "Informe a senha do banco ou configure SUPABASE_DB_PASSWORD / DATABASE_URL.",
       },
       { status: 400 },
     );
@@ -63,14 +52,8 @@ export async function POST(request: Request) {
     "utf8",
   );
 
-  const client = new pg.Client({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-  });
-
   try {
-    await client.connect();
-    await client.query(sql);
+    await runSqlMigration({ projectRef, password, sql });
     return NextResponse.json({ ok: true, message: "Migration applied" });
   } catch (error) {
     return NextResponse.json(
@@ -80,7 +63,5 @@ export async function POST(request: Request) {
       },
       { status: 500 },
     );
-  } finally {
-    await client.end().catch(() => undefined);
   }
 }
